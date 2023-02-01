@@ -86,9 +86,12 @@ export default {
   },
   methods: {
     dateConvert(date) {
-      if (date.seconds != undefined) {
+      if (date != null && "seconds" in date) {
         let dt = new Date(date.seconds * 1000);
-        return dt.getHours() + ":" + dt.getMinutes();
+        let hour = dt.getHours() < 10 ? "0" + dt.getHours() : dt.getHours();
+        let minute =
+          dt.getMinutes() < 10 ? "0" + dt.getMinutes() : dt.getMinutes();
+        return hour + ":" + minute;
       }
     },
 
@@ -98,17 +101,16 @@ export default {
 
     getMessage() {
       firebaseGetData("messages", this.chatData);
-      console.log(this.chatData);
     },
 
-    async sendMessage() {
+    async sendMessage(e) {
+      e.preventDefault();
       if (document.querySelector(".add").message.value != "") {
         await firebaseCreateData("messages", {
           message: document.querySelector(".add").message.value,
           createdAt: serverTimestamp(),
         });
       } else {
-        console.log("empty");
         return;
       }
     },
