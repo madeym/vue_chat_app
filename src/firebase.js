@@ -1,5 +1,7 @@
 import { initializeApp } from 'firebase/app';
 import { getFirestore, collection, onSnapshot, addDoc, deleteDoc, doc, query, where, orderBy, updateDoc } from 'firebase/firestore';
+import { createUserWithEmailAndPassword, getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged } from 'firebase/auth';
+import { useAuthStore } from './stores/auth';
 
 const firebaseConfig = {
   apiKey: "AIzaSyBxKj0JIrVQHV5xr4qtZf030Qhq9BiqV2s",
@@ -13,10 +15,13 @@ const firebaseConfig = {
 initializeApp(firebaseConfig);
 
 const db = getFirestore();
+const auth = getAuth();
+let user_id = '';
 
 export const database = getFirestore();
 
 export async function firebaseCreateData(colRef, data) {
+    data.user_id = user_id;
     await addDoc(collection(db, colRef), data);
 }
 
@@ -43,3 +48,30 @@ export async function firebaseDeleteData(colRef, id) {
     await deleteDoc(doc(db, colRef, id));
 }
 
+export async function firebaseSignInBasic(email, password) {
+    return await signInWithEmailAndPassword(auth, email, password);
+}
+
+export async function firebaseSignUpBasic(email, password) {
+    return await createUserWithEmailAndPassword(auth, email, password);
+}
+
+export async function firebaseSignOut() {
+    try {
+        await signOut(auth);
+        console.log('user logout');
+    } catch (error) {
+        console.log(error.message);
+    }
+}
+
+export {user_id};
+
+onAuthStateChanged(auth, (user) => {
+    if(user) {
+        user_id = user.uid;
+        localStorage.setItem('isAuth', true);
+    }else {
+        localStorage.setItem('isAuth', false);
+    }
+});

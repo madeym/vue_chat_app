@@ -1,7 +1,9 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import HomeView from '../views/HomeView.vue'
-import CameraPage from '../views/CameraPage/CameraPage.vue'
+import LoginPage from '../views/LoginPage/LoginPage.vue'
+import RegisterPage from '../views/RegisterPage/RegisterPage.vue'
 import ChatPage from '../views/ChatPage/ChatPage.vue'
+import { useAuthStore } from '../stores/auth'
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -20,16 +22,37 @@ const router = createRouter({
       component: () => import('../views/AboutView.vue')
     },
     {
-      path: '/camera',
-      name: 'camera',
-      component: CameraPage
+      path: '/login',
+      name: 'login',
+      component: LoginPage,
+      meta: {auth: false},
+    },{
+      path: '/register',
+      name: 'register',
+      component: RegisterPage,
+      meta: {auth: false}
     },
     {
       path: '/chat',
       name: 'chat',
-      component: ChatPage
+      component: ChatPage,
+      meta: {auth: true}
     }
   ]
 })
+
+router.beforeEach((to, from, next) => {
+  var isAuth = localStorage.getItem('isAuth');
+  console.log(isAuth);
+  if (to.meta.auth && isAuth) {
+    next();
+  }else if (to.meta.auth && !isAuth) {
+    next('/login');
+  }else if (!to.meta.auth && isAuth){
+    next('/chat');
+  }else {
+    next();
+  }
+});
 
 export default router
