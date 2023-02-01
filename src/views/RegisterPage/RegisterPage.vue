@@ -38,7 +38,7 @@
     </form>
     <div class="d-flex gap-2 justify-content-center">
       <span clspanss="text-no-decoration">Have an account ?</span>
-      <a href="#" class="text-decoration-none">Login</a>
+      <router-link class="text-decoration-none" to="/login">Login</router-link>
     </div>
   </div>
 

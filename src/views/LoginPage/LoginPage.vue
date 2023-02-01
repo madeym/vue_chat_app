@@ -33,8 +33,9 @@
       </div>
     </form>
     <div class="d-flex gap-2 justify-content-center">
-      <!-- <a href="#" class="text-decoration-none">Forgot Password ?</a> -->
-      <a href="#" class="text-decoration-none">Create an Account</a>
+      <router-link class="text-decoration-none" to="/register"
+        >Create an Account</router-link
+      >
     </div>
   </div>
 </template>
