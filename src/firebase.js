@@ -1,6 +1,6 @@
 import { initializeApp } from 'firebase/app';
 import { getFirestore, collection, onSnapshot, addDoc, deleteDoc, doc, query, where, orderBy, updateDoc } from 'firebase/firestore';
-import { createUserWithEmailAndPassword, getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged } from 'firebase/auth';
+import { createUserWithEmailAndPassword, getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged, updateProfile } from 'firebase/auth';
 import { useAuthStore } from './stores/auth';
 
 const firebaseConfig = {
@@ -17,11 +17,13 @@ initializeApp(firebaseConfig);
 const db = getFirestore();
 const auth = getAuth();
 let user_id = '';
+let userData = {};
 
 export const database = getFirestore();
 
 export async function firebaseCreateData(colRef, data) {
     data.user_id = user_id;
+    data.user_name = userData.displayName;
     await addDoc(collection(db, colRef), data);
 }
 
@@ -52,8 +54,12 @@ export async function firebaseSignInBasic(email, password) {
     return await signInWithEmailAndPassword(auth, email, password);
 }
 
-export async function firebaseSignUpBasic(email, password) {
-    return await createUserWithEmailAndPassword(auth, email, password);
+export async function firebaseSignUpBasic(displayName, email, password) {
+    let cred = await createUserWithEmailAndPassword(auth, email, password);
+    updateProfile(auth.currentUser, {
+        displayName: displayName
+    });
+    return cred;
 }
 
 export async function firebaseSignOut() {
@@ -69,9 +75,14 @@ export {user_id};
 
 onAuthStateChanged(auth, (user) => {
     if(user) {
+        userData = user;
+        console.log(user);
         user_id = user.uid;
         localStorage.setItem('isAuth', true);
     }else {
+        userData = {};
+        user_id = '';
+        
         localStorage.setItem('isAuth', false);
     }
 });

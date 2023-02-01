@@ -21,36 +21,46 @@
       <div
         v-for="chat in chatData"
         v-bind:key="chat.id"
-        class="my-3 d-flex align-items-end"
-        :class="{ 'justify-content-end': checkMessage(chat.user_id) }"
+        class="my-3 d-flex flex-column"
+        :class="{ 'align-items-end': checkMessage(chat.user_id) }"
       >
-        <span
-          v-if="checkMessage(chat.user_id)"
-          style="font-size: 12px"
-          class="me-2"
-          >{{ dateConvert(chat.createdAt) }}</span
-        >
-        <span
-          class="py-2 text-white border-1 rounded px-3"
-          :class="{
-            'bg-primary': checkMessage(chat.user_id),
-            'bg-warning': !checkMessage(chat.user_id),
-          }"
-          style="max-width: 60% !important; width: fit-content"
-        >
-          {{ chat.message }}
-        </span>
-        <span
-          v-if="!checkMessage(chat.user_id)"
-          style="font-size: 12px"
-          class="ms-2"
-          >{{ dateConvert(chat.createdAt) }}</span
-        >
+        <span class="p-1" v-if="!checkMessage(chat.user_id)">{{
+          chat.user_name
+        }}</span>
+        <div class="d-flex align-items-end">
+          <span
+            v-if="checkMessage(chat.user_id)"
+            style="font-size: 12px"
+            class="me-2"
+            >{{ dateConvert(chat.createdAt) }}</span
+          >
+          <span
+            class="py-2 text-white border-1 rounded px-3"
+            :class="{
+              'bg-primary': checkMessage(chat.user_id),
+              'bg-warning': !checkMessage(chat.user_id),
+            }"
+            style="max-width: 60% !important; width: fit-content"
+          >
+            {{ chat.message }}
+          </span>
+          <span
+            v-if="!checkMessage(chat.user_id)"
+            style="font-size: 12px"
+            class="ms-2"
+            >{{ dateConvert(chat.createdAt) }}</span
+          >
+        </div>
       </div>
     </div>
     <form class="add" @submit.prevent="sendMessage">
       <div class="d-flex">
-        <input type="text" name="message" class="px-2 input-msg" />
+        <input
+          type="text"
+          name="message"
+          class="px-2 input-msg"
+          placeholder="Message"
+        />
         <button type="submit" class="btn btn-primary">Send</button>
       </div>
     </form>
@@ -66,7 +76,6 @@ import {
 } from "@/firebase";
 import { getAuth, onAuthStateChanged } from "firebase/auth";
 import { serverTimestamp } from "@firebase/firestore";
-import { ref } from "@vue/reactivity";
 
 export default {
   data() {
@@ -77,12 +86,14 @@ export default {
   },
   methods: {
     dateConvert(date) {
-      let dt = new Date(date.seconds * 1000);
-      return dt.getHours() + ":" + dt.getMinutes();
+      if (date.seconds != undefined) {
+        let dt = new Date(date.seconds * 1000);
+        return dt.getHours() + ":" + dt.getMinutes();
+      }
     },
 
     checkMessage(uidChat) {
-      return uidChat == this.userID ? true : false;
+      return uidChat === this.userID ? true : false;
     },
 
     getMessage() {
@@ -91,10 +102,15 @@ export default {
     },
 
     async sendMessage() {
-      await firebaseCreateData("messages", {
-        message: document.querySelector(".add").message.value,
-        createdAt: serverTimestamp(),
-      });
+      if (document.querySelector(".add").message.value != "") {
+        await firebaseCreateData("messages", {
+          message: document.querySelector(".add").message.value,
+          createdAt: serverTimestamp(),
+        });
+      } else {
+        console.log("empty");
+        return;
+      }
     },
 
     async updateMessage() {
@@ -116,7 +132,7 @@ export default {
       );
     },
   },
-  mounted() {
+  beforeMount() {
     this.getMessage();
     onAuthStateChanged(getAuth(), (user) => {
       if (user) {

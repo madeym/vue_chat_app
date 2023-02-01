@@ -8,6 +8,14 @@
       <div class="form-group mb-3">
         <input
           type="text"
+          name="displayName"
+          class="form-control"
+          placeholder="Username"
+        />
+      </div>
+      <div class="form-group mb-3">
+        <input
+          type="text"
           name="email"
           class="form-control"
           placeholder="Email"
@@ -23,7 +31,9 @@
       </div>
 
       <div class="form-group mb-4 mt-4 d-flex justify-content-center">
-        <button type="submit" class="btn btn-primary btn-block">Sign Up</button>
+        <button type="submit" class="btn btn-primary btn-block" id="signUp">
+          Sign Up
+        </button>
       </div>
     </form>
     <div class="d-flex gap-2 justify-content-center">
@@ -40,10 +50,20 @@ import { firebaseSignUpBasic, firebaseSignOut } from "@/firebase";
 export default {
   methods: {
     async SignUp() {
-      let res = await firebaseSignUpBasic(
-        document.querySelector(".signup").email.value,
-        document.querySelector(".signup").password.value
-      );
+      try {
+        let btn = document.getElementById("signUpBtn");
+        btn.innerHTML = "Loading";
+        btn.disabled = true;
+        let res = await firebaseSignUpBasic(
+          document.querySelector(".signup").displayName.value,
+          document.querySelector(".signup").email.value,
+          document.querySelector(".signup").password.value
+        );
+        this.$router.push("chat");
+      } catch (error) {
+        btn.innerHTML = "Sign Up";
+        btn.disabled = false;
+      }
     },
     async SignOut() {
       await firebaseSignOut();
