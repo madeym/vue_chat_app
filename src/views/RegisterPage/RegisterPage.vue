@@ -31,7 +31,7 @@
       </div>
 
       <div class="form-group mb-4 mt-4 d-flex justify-content-center">
-        <button type="submit" class="btn btn-primary btn-block" id="signUp">
+        <button type="submit" class="btn btn-primary btn-block" id="signUpBtn">
           Sign Up
         </button>
       </div>
