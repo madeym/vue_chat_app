@@ -41,5 +41,18 @@ const router = createRouter({
   ]
 })
 
+router.beforeEach((to, from, next) => {
+  var isAuth = localStorage.getItem('isAuth');
+  console.log(isAuth);
+  if (to.meta.auth && isAuth) {
+    next();
+  }else if (to.meta.auth && !isAuth) {
+    next('/login');
+  }else if (!to.meta.auth && isAuth){
+    next('/chat');
+  }else {
+    next();
+  }
+});
 
 export default router
