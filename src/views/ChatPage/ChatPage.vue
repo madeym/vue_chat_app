@@ -16,13 +16,15 @@
   <div class="container d-flex flex-column mx-auto col-4" style="height: 100vh">
     <div
       style="height: 95vh; background-color: #2596be; overflow-y: auto"
-      class="py-4 px-2 d-flex flex-column"
+      class="py-4 px-2 d-flex flex-column chat-wrapper"
     >
       <div
         v-for="chat in chatData"
         v-bind:key="chat.id"
-        class="my-3 d-flex flex-column"
-        :class="{ 'align-items-end': checkMessage(chat.user_id) }"
+        class="mt-3 d-grid col-12 chat-content"
+        :class="{
+          'justify-content-end': checkMessage(chat.user_id),
+        }"
       >
         <span class="p-1" v-if="!checkMessage(chat.user_id)">{{
           chat.user_name
@@ -35,12 +37,12 @@
             >{{ dateConvert(chat.createdAt) }}</span
           >
           <span
-            class="py-2 text-white border-1 rounded px-3"
+            class="py-2 text-white rounded px-3"
             :class="{
               'bg-primary': checkMessage(chat.user_id),
               'bg-warning': !checkMessage(chat.user_id),
             }"
-            style="max-width: 60% !important; width: fit-content"
+            style="width: fit-content; margin: 0 !important"
           >
             {{ chat.message }}
           </span>
@@ -76,6 +78,7 @@ import {
 } from "@/firebase";
 import { getAuth, onAuthStateChanged } from "firebase/auth";
 import { serverTimestamp } from "@firebase/firestore";
+import { nextTick } from "@vue/runtime-core";
 
 export default {
   data() {
@@ -105,10 +108,16 @@ export default {
 
     async sendMessage(e) {
       e.preventDefault();
+      let chatContent = document.querySelectorAll(".chat-content");
       if (document.querySelector(".add").message.value != "") {
         await firebaseCreateData("messages", {
           message: document.querySelector(".add").message.value,
           createdAt: serverTimestamp(),
+        });
+        nextTick(() => {
+          chatContent[chatContent.length - 1].scrollIntoView({
+            behavior: "smooth",
+          });
         });
       } else {
         return;

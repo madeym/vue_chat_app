@@ -65,7 +65,6 @@ export async function firebaseSignUpBasic(displayName, email, password) {
 export async function firebaseSignOut() {
     try {
         await signOut(auth);
-        console.log('user logout');
     } catch (error) {
         console.log(error.message);
     }
@@ -76,7 +75,6 @@ export {user_id};
 onAuthStateChanged(auth, (user) => {
     if(user) {
         userData = user;
-        console.log(user);
         user_id = user.uid;
         localStorage.setItem('isAuth', true);
     }else {
