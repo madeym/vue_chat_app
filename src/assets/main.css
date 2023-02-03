@@ -1,0 +1,19 @@
+.outline-0 {
+    outline: 0;
+}
+
+.cursor-pointer {
+    cursor: pointer;
+}
+
+.circle {
+    clip-path: circle();
+}
+
+.color-grey {
+    color: grey;
+}
+
+.active-window {
+    background-color: #CA9CE1;
+}

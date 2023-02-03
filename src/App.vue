@@ -2,6 +2,7 @@
 import { RouterLink, RouterView } from "vue-router";
 import "bootstrap/dist/css/bootstrap.min.css";
 import "bootstrap";
+import "./assets/main.css";
 </script>
 
 <template>

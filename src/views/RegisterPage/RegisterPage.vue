@@ -50,10 +50,10 @@ import { firebaseSignUpBasic, firebaseSignOut } from "@/firebase";
 export default {
   methods: {
     async SignUp() {
+      let btn = document.getElementById("signUpBtn");
+      btn.innerHTML = "Loading";
+      btn.disabled = true;
       try {
-        let btn = document.getElementById("signUpBtn");
-        btn.innerHTML = "Loading";
-        btn.disabled = true;
         let res = await firebaseSignUpBasic(
           document.querySelector(".signup").displayName.value,
           document.querySelector(".signup").email.value,
@@ -61,6 +61,7 @@ export default {
         );
         this.$router.push("chat");
       } catch (error) {
+        console.log(error.message);
         btn.innerHTML = "Sign Up";
         btn.disabled = false;
       }
