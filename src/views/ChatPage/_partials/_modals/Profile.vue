@@ -28,7 +28,7 @@
               </select>
             </div>
             <div class="d-flex justify-content-center">
-              <button type="submit" class="btn btn-primary mt-4">Save</button>
+              <button type="submit" class="btn text-white text-primary-color mt-4">Save</button>
             </div>
           </form>
         </div>
@@ -46,7 +46,7 @@ export default {
   },
   data() {
     return {
-      profilePicture: this.userData.picture
+      profilePicture: (this.userData.picture) ? this.userData.picture : '',
     }
   },
   methods: {

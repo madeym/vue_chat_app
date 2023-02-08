@@ -27,20 +27,28 @@ export default {
         async addContact(evt) {
             evt.preventDefault();
             let defaultHTML = evt.target.innerHTML;
+            evt.target.disabled = true;
             this.formSubmitted = true;
             evt.target.innerHTML = 'Loading';
 
-            this.userData.contacts = [];
+            this.userData.contacts = (this.userData.contacts) ? this.userData.contacts : [];
+            this.searchResult.contacts = (this.searchResult.contacts) ? this.searchResult.contacts : [];
 
             try {
                 let res = await firebaseCreateData('messages', {
-                    data: []
+                    data: [],
+                    is_group: false,
                 });
                 this.userData.contacts.push({
                     user_id: this.searchResult.id,
                     messages_id: res.id
                 });
+                this.searchResult.contacts.push({
+                    user_id: this.userData.id,
+                    messages_id: res.id
+                });
                 await firebaseUpdateSingleData('users', this.userData.id, this.userData);
+                await firebaseUpdateSingleData('users', this.searchResult.id, this.searchResult);
                 document.querySelector('.btn-close').click();
             } catch (error) {
                 console.log(error.message);
@@ -48,6 +56,8 @@ export default {
 
             this.formSubmitted = false;
             evt.target.innerHTML = defaultHTML;
+            evt.target.disabled = false;
+
         }
     },
 }
@@ -69,14 +79,14 @@ export default {
                                 class="circle cursor-pointer" width="100" height="100" />
                             <h5 class="mt-3">{{ searchResult.displayName }}</h5>
                         </div>
-                        <div class="mt-4">
+                        <div class="mt-4 d-flex justify-content-center">
                             <input type="text" placeholder="Search"
                                 class="shadow rounded-pill px-3 py-1 col-11 outline-0 border-0 left-search"
                                 name="searchContact" @keyup="searchContact($event)">
                         </div>
                         <div class="d-flex justify-content-center">
-                            <button type="submit" class="btn btn-primary mt-4" @click="addContact">
-                                <LoadSpinner v-if="formSubmitted" />
+                            <button type="submit" class="btn text-white text-primary-color mt-4" @click="addContact">
+                                <LoadSpinner :class="{ 'd-none': !formSubmitted }" />
                                 <span>Add</span>
                             </button>
                         </div>
