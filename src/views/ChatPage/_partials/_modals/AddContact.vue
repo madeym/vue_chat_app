@@ -82,10 +82,11 @@ export default {
                         <div class="mt-4 d-flex justify-content-center">
                             <input type="text" placeholder="Search"
                                 class="shadow rounded-pill px-3 py-1 col-11 outline-0 border-0 left-search"
-                                name="searchContact" @keyup="searchContact($event)">
+                                name="searchContact" @keyup="searchContact($event)" required>
                         </div>
                         <div class="d-flex justify-content-center">
-                            <button type="submit" class="btn text-white text-primary-color mt-4" @click="addContact">
+                            <button type="submit" class="btn text-white text-primary-color mt-4"
+                                @click="addContact($event)">
                                 <LoadSpinner :class="{ 'd-none': !formSubmitted }" />
                                 <span>Add</span>
                             </button>

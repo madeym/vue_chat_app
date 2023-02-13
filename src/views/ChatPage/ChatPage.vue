@@ -3,6 +3,8 @@ import Loading from './_partials/_modals/Loading.vue';
 import AddContact from './_partials/_modals/AddContact.vue';
 import Profile from './_partials/_modals/Profile.vue';
 import CreateGroup from './_partials/_modals/CreateGroup.vue';
+import UnsendMessage from './_partials/_modals/UnsendMessage.vue';
+import CreatePoll from './_partials/_modals/CreatePoll.vue';
 import './ChatPage.css';
 </script>
 <script>
@@ -12,8 +14,9 @@ import {
 } from "@/firebase";
 import { serverTimestamp, Timestamp } from "@firebase/firestore";
 import { nextTick, watch } from "@vue/runtime-core";
-import { firebaseGetSingleData } from '../../firebase';
+import { firebaseGetSingleData, firebaseSignOut } from '../../firebase';
 import { isEmpty } from "lodash";
+import { SendNotification } from '../../assets/js/helpers.js';
 
 export default {
   data() {
@@ -22,10 +25,11 @@ export default {
       chatData: [],
       currectChatWindowID: -1,
       showSideBar: true,
-      isLoadData: true,
       isLoadMessageDataUserData: true,
       isLoadUserData: true,
       showDarkWindow: false,
+      rightClickData: {},
+      rightClickState: '',
     };
   },
   methods: {
@@ -133,6 +137,28 @@ export default {
       return names;
     },
 
+    getChatGroupMemberPicture(chatData, chat) {
+      let pic = '';
+      if (chatData.messageData.is_group) {
+        chatData.userData.forEach(list => {
+          if (list.id == chat.user_id) {
+            if (list.picture) {
+              return pic = list.picture;
+            } else {
+              return pic = 'https://img.icons8.com/fluency/48/null/test-account.png';
+            }
+          }
+        });
+      } else {
+        if (chatData.userData.picture) {
+          return pic = chatData.userData.picture;
+        } else {
+          return pic = 'https://img.icons8.com/fluency/48/null/test-account.png';
+        }
+      }
+      return pic;
+    },
+
     selectAttach() {
       document.querySelector('.add').fileAttach.click();
     },
@@ -182,8 +208,8 @@ export default {
           message: document.querySelector(".add").message.value,
           created_at: Timestamp.now(),
         });
-        await firebaseUpdateSingleData("messages", this.userData.contacts[this.currectChatWindowID].messages_id, this.chatData[this.currectChatWindowID].messageData);
         document.querySelector(".add").message.value = '';
+        await firebaseUpdateSingleData("messages", this.userData.contacts[this.currectChatWindowID].messages_id, this.chatData[this.currectChatWindowID].messageData);
       } else {
         return;
       }
@@ -217,80 +243,103 @@ export default {
       );
     },
 
-    rightClickMessage(evt) {
-      if (evt.which == 3) {
-        evt.preventDefault();
-        evt.target.classList.add('z-index-3');
-        this.showDarkWindow = true;
-        document.querySelector('.right-click-message').style.top = evt.screenY + 'px';
-        document.querySelector('.right-click-message').style.left = evt.screenX + 'px';
-      }
-    }
-  },
-  beforeMount() {
-    this.userData = JSON.parse(localStorage.getItem('userData'));
-    if (this.userData) {
-      firebaseGetSingleData('users', this.userData.id, this.userData, true);
-    }
-
-    watch(this.userData, async () => {
-      if (this.isLoadUserData) {
-        await this.getMessage();
-        this.isLoadUserData = false;
-      } else return;
-    });
-
-    watch(this.chatData, async () => {
-      if (this.currectChatWindowID != -1) {
-        this.scrollNewMessage();
-      }
-      if (this.isLoadMessageDataUserData && Array.isArray(this.chatData)) {
-        let flag = true;
-        this.chatData.forEach(async (list, idx) => {
-          if (isEmpty(list.userData) && !list.isRequestUserData) {
-            flag = false;
-            if (!isEmpty(list.messageData)) {
-              list.isRequestUserData = true;
-              if (list.messageData.is_group == true) {
-                list.userData = [];
-                if (list.messageData.group_data && list.messageData.group_data.member) {
-                  list.messageData.group_data.member.forEach(async (list2, idx2) => {
-                    list.userData[idx2] = {};
-                    await firebaseGetSingleData('users', list2.user_id, list.userData[idx2], true);
-                  });
-                }
-              } else {
-                list.userData = {};
-                await firebaseGetSingleData('users', this.userData.contacts[idx].user_id, list.userData, true);
-              }
-            }
-          }
-        });
-        if (flag) {
-          document.querySelector('.loading-btn').click();
-          this.isLoadMessageDataUserData = false;
+    rightClickMessage(evt, chatData, idx) {
+      if (this.checkMessage(chatData.messageData.data[idx].user_id)) {
+        if (evt.which == 3 && !this.showDarkWindow) {
+          this.rightClickData.data = chatData.messageData;
+          this.rightClickData.idx = idx;
+          evt.preventDefault();
+          this.showDarkWindow = true;
+          document.querySelector('.right-click-message').style.top = evt.screenY + 'px';
+          document.querySelector('.right-click-message').style.left = evt.screenX + 'px';
         }
       } else return;
-    });
+    },
+
+    openModalRightClick(menu) {
+      this.rightClickState = menu;
+    },
+
+    async logout() {
+      try {
+        await firebaseSignOut();
+        SendNotification('Successfully Logout', 200);
+        this.$router.push('login');
+      } catch (error) {
+        SendNotification(error.message, 500);
+      }
+    }
   },
   mounted() {
-    document.querySelector('.loading-btn').click();
+    document.getElementById('loadingbtn').click();
+
+    setTimeout(() => {
+      this.userData = JSON.parse(localStorage.getItem('userData'));
+      firebaseGetSingleData('users', this.userData.uid, this.userData, true);
+
+      watch(this.userData, async () => {
+        if (this.isLoadUserData) {
+          await this.getMessage();
+          this.isLoadUserData = false;
+        } else return;
+      });
+
+      watch(this.chatData, async () => {
+        if (this.currectChatWindowID != -1) {
+          this.scrollNewMessage();
+        }
+        if (this.isLoadMessageDataUserData && Array.isArray(this.chatData)) {
+          let flag = true;
+          this.chatData.forEach(async (list, idx) => {
+            if (isEmpty(list.userData) && !list.isRequestUserData) {
+              flag = false;
+              if (!isEmpty(list.messageData)) {
+                list.isRequestUserData = true;
+                if (list.messageData.is_group == true) {
+                  list.userData = [];
+                  if (list.messageData.group_data && list.messageData.group_data.member) {
+                    list.messageData.group_data.member.forEach(async (list2, idx2) => {
+                      list.userData[idx2] = {};
+                      await firebaseGetSingleData('users', list2.user_id, list.userData[idx2], true);
+                    });
+                  }
+                } else {
+                  list.userData = {};
+                  await firebaseGetSingleData('users', this.userData.contacts[idx].user_id, list.userData, true);
+                }
+              }
+            }
+          });
+          if (flag) {
+            document.getElementById('loadingbtn').click();
+            this.isLoadMessageDataUserData = false;
+          }
+        } else return;
+      });
+    }, 500);
   }
 };
 </script>
 
 <template>
-  <Loading />
+  <Loading v-if="isLoadMessageDataUserData" />
   <div v-if="!isLoadMessageDataUserData" class="d-flex h-100 position-relative">
     <AddContact :userData="userData" />
     <Profile :userData="userData" />
     <CreateGroup :userData="userData" />
+    <UnsendMessage :rightClickData="rightClickData" />
+    <CreatePoll :chatData="currectChatWindowID != -1 ? chatData[currectChatWindowID].messageData : {}"
+      :userData="userData" />
     <div class="dropdown right-click-message" style="width: fit-content;">
-      <span data-bs-toggle="dropdown" class="right-click-message-btn" aria-expanded="false"></span>
+      <span data-bs-toggle="dropdown" aria-expanded="false"></span>
       <ul class="dropdown-menu right-click-message-dropdown" :class="{ 'show': showDarkWindow }">
-        <li><a class="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="">Edit Message</a>
+        <li><a class="dropdown-item edit-msg" href="#">Edit Message</a>
         </li>
-        <li><a class="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="">Unsend Message</a>
+        <li v-if="!isEmpty(rightClickData) && !rightClickData.data.data[rightClickData.idx].is_unsend"><a
+            class="dropdown-item unsend-msg" href="#" data-bs-toggle="modal" data-bs-target="#unsendMessageModal">Unsend
+            Message</a>
+        </li>
+        <li><a class="dropdown-item delete-msg" href="#">Delete Message</a>
         </li>
       </ul>
     </div>
@@ -306,6 +355,8 @@ export default {
                 Contact</a></li>
             <li><a class="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#createGroupModal">Create
                 Group</a>
+            </li>
+            <li><a class="dropdown-item" href="#" @click="logout()">Logout</a>
             </li>
           </ul>
         </div>
@@ -363,29 +414,55 @@ export default {
           </div>
         </div>
       </div>
-      <div v-if="currectChatWindowID != -1" style="overflow-y: auto" class="d-flex flex-column position-relative"
+      <div v-if="currectChatWindowID != -1" class="d-flex flex-column position-relative py-3 overflow-y-auto"
         :class="{ 'h-85': chatData[currectChatWindowID].messageData.is_group, 'h-95': !chatData[currectChatWindowID].messageData.is_group }">
-        <div v-for="chat in chatData[currectChatWindowID].messageData.data" v-bind:key="chat.id"
-          class="mt-3 d-grid col-12 chat-content py-1 px-2" :class="{
+        <div v-for="(chat, idxChat) in chatData[currectChatWindowID].messageData.data" v-bind:key="chat.id"
+          class="mt-2 d-grid col-12 chat-content py-1 px-2" :class="{
             'justify-content-end': checkMessage(chat.user_id),
           }">
           <div class="d-flex align-items-end">
             <div v-if="!checkMessage(chat.user_id)" class="d-flex align-items-start h-100">
-              <img
-                :src="chatData[currectChatWindowID].userData.picture ? chatData[currectChatWindowID].userData.picture : 'https://img.icons8.com/fluency/48/null/test-account.png'"
-                width="50" class="circle mt-1 me-2" />
+              <img :src="getChatGroupMemberPicture(chatData[currectChatWindowID], chat)" width="50"
+                class="circle mt-1 me-2" />
             </div>
             <span v-if="checkMessage(chat.user_id)" style="font-size: 12px" class="me-2">{{
               dateConvert(chat.created_at)
             }}</span>
-            <div class="d-flex flex-column" @mousedown="rightClickMessage($event)" oncontextmenu="return false;">
+            <div class="d-flex flex-column"
+              :class="{ 'z-index-3': (!isEmpty(rightClickData) && idxChat == rightClickData.idx) }"
+              @mousedown="rightClickMessage($event, chatData[currectChatWindowID], idxChat)"
+              oncontextmenu="return false;">
               <span class="p-1" v-if="!checkMessage(chat.user_id)">{{ chat.user_name }}</span>
-              <img v-if="chat.is_file" :src="chat.message" alt="" width="120" class="shadow cursor-pointer">
-              <span v-if="!chat.is_file" class="py-2 rounded px-3 shadow" :class="{
+              <img v-if="!chat.is_unsend && chat.is_file && !chat.is_poll" :src="chat.message" alt="" width="120"
+                class="shadow cursor-pointer">
+              <span v-else-if="(chat.is_unsend || !chat.is_file) && !chat.is_poll" class="py-2 rounded px-3 shadow"
+                :class="{
+                  'text-primary-color text-white': checkMessage(chat.user_id),
+                  'bg-light': !checkMessage(chat.user_id),
+                  'fst-italic': chat.is_unsend
+                }" style="width: fit-content; margin: 0 !important">
+                {{ chat.is_unsend ? 'this message was unsend' : chat.message }}
+              </span>
+              <span v-if="chat.is_poll" class="py-2 rounded px-3 shadow" :class="{
                 'text-primary-color text-white': checkMessage(chat.user_id),
                 'bg-light': !checkMessage(chat.user_id),
-              }" style="width: fit-content; margin: 0 !important">
-                {{ chat.message }}
+              }">
+                <div class="d-grid">
+                  <h5 class="fw-bold">Poll :</h5>
+                  <h6>{{ chat.poll_title }}</h6>
+                  <div v-for="(option, idx) in chat.optionData" class="d-grid mb-2">
+                    <div class="d-flex align-items-center gap-2 mb-1">
+                      <input type="radio" name="vote" class="form-check-input">
+                      <span>{{ idx + 1 }}. {{ option.name }}</span>
+                    </div>
+                    <div class="d-flex align-items-center gap-2">
+                      <div style="width: 200px; height: 10px;" class="bg-light rounded position-relative">
+                        <div class="position-absolute bg-warning col-3 rounded" style="height: 10px;"></div>
+                      </div>
+                      <span>92%</span>
+                    </div>
+                  </div>
+                </div>
               </span>
             </div>
             <span v-if="!checkMessage(chat.user_id)" style="font-size: 12px" class="ms-2">{{
@@ -396,8 +473,21 @@ export default {
       </div>
       <form v-if="currectChatWindowID != -1" class="add" @submit.prevent="sendMessage($event)" style="height: 5vh;">
         <div class="d-flex">
-          <div class="bg-light d-flex justify-content-center align-items-center px-2 cursor-pointer">
-            <img src="https://img.icons8.com/fluency/48/null/attach.png" width="20" @click="selectAttach()" />
+          <div class="dropdown bg-light d-flex justify-content-center align-items-center px-3 cursor-pointer"
+            data-bs-toggle="dropdown">
+            <font-awesome-icon icon="fa-solid fa-plus" />
+            <ul class="dropdown-menu right-click-message-dropdown">
+              <li><a href="#" class="dropdown-item d-flex align-items-center gap-2" @click="selectAttach()">
+                  <font-awesome-icon icon="fa-solid fa-paperclip" />
+                  Attach File
+                </a></li>
+              <li v-if="chatData[currectChatWindowID].messageData.is_group"><a href="#"
+                  class="dropdown-item d-flex align-items-center gap-2" data-bs-toggle="modal"
+                  data-bs-target="#createPollModal">
+                  <font-awesome-icon icon="fa-solid fa-square-poll-vertical" />
+                  Create Poll
+                </a></li>
+            </ul>
           </div>
           <input type="file" class="d-none" name="fileAttach" @change="handleFile($event, idx)">
           <input type="text" name="message" class="px-2 input-msg border-0" style="width: 95%;" placeholder="Message" />

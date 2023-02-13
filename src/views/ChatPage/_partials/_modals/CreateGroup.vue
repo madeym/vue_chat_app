@@ -147,7 +147,6 @@ export default {
                                     <span class="font-12 color-grey">{{
                                         contact.email
                                     }}</span>
-
                                 </div>
                             </div>
                         </div>

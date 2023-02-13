@@ -30,6 +30,10 @@
     overflow-x: auto;
 }
 
+.overflow-y-auto {
+    overflow-y: auto;
+}
+
 .w-50px {
     min-width: 50px !important;
     width: 50px !important;
@@ -83,6 +87,13 @@
 
 .text-primary-color {
     background-color: #666b5e;
+    opacity: 0.8;
+    transition: opacity 0.3s ease-in-out;
+}
+
+.text-primary-color:hover {
+    background-color: #666b5e;
+    opacity: 1;
 }
 
 .opacity-0 {
@@ -104,4 +115,8 @@
     overflow-y: hidden;
     display: block;
     z-index: -1;
+}
+
+.w-fit {
+    width: fit-content;
 }

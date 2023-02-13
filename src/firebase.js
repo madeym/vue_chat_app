@@ -1,6 +1,7 @@
 import { initializeApp } from 'firebase/app';
 import { getFirestore, collection, onSnapshot, addDoc, deleteDoc, doc, query, where, orderBy, updateDoc, setDoc, getDoc, getDocs } from 'firebase/firestore';
 import { createUserWithEmailAndPassword, getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged, updateProfile } from 'firebase/auth';
+import { SendNotification } from './assets/js/helpers.js';
 
 const firebaseConfig = {
     apiKey: "AIzaSyBxKj0JIrVQHV5xr4qtZf030Qhq9BiqV2s",
@@ -83,11 +84,9 @@ export async function firebaseSignUpBasic(displayName, email, password) {
 }
 
 export async function firebaseSignOut() {
-    try {
-        await signOut(auth);
-    } catch (error) {
-        console.log(error.message);
-    }
+    await signOut(auth);
+    localStorage.setItem('isAuth', false);
+    localStorage.setItem('userData', '');
 }
 
 export { user_id };
@@ -95,11 +94,9 @@ export { user_id };
 onAuthStateChanged(auth, async (user) => {
     if (user) {
         user_id = user.uid;
-        await firebaseGetSingleData('users', user_id, userData);
         localStorage.setItem('isAuth', true);
-        localStorage.setItem('userData', JSON.stringify(userData));
+        localStorage.setItem('userData', JSON.stringify(user));
     } else {
-        userData = {};
         user_id = '';
         localStorage.setItem('isAuth', false);
         localStorage.setItem('userData', '');
