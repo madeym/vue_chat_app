@@ -1,4 +1,8 @@
+<script setup>
+import LoadSpinner from "../../../../components/LoadSpinner.vue";
+</script>
 <script>
+import { SendNotification } from '../../../../assets/js/helpers';
 import { firebaseUpdateSingleData } from '../../../../firebase';
 export default {
   props: {
@@ -7,6 +11,8 @@ export default {
   data() {
     return {
       profilePicture: (this.userData.picture) ? this.userData.picture : '',
+      dataUser: {},
+      isLoad: false,
     }
   },
   methods: {
@@ -30,18 +36,28 @@ export default {
     },
 
     async updateProfile(evt) {
+      this.isLoad = true;
       evt.preventDefault();
-      document.querySelector('.btn-close').click();
       try {
-        this.userData.picture = this.profilePicture;
-        await firebaseUpdateSingleData('users', this.userData.id, this.userData);
+        let temp = {
+          id: this.userData.id,
+          dateOfBirth: this.userData.dateOfBirth,
+          displayName: this.userData.displayName,
+          email: this.userData.email,
+          gender: this.dataUser.gender,
+          picture: (this.profilePicture != '') ? this.profilePicture : this.userData.picture
+        }
+        await firebaseUpdateSingleData('users', temp.id, temp);
+        document.querySelector('.btn-close-profile').click();
+        SendNotification("Successfully Updated Profile", 200);
       } catch (error) {
-        console.log(error.message);
+        SendNotification(error.message, 500);
       }
+      this.isLoad = false;
     }
   },
-  beforeMount() {
-
+  mounted() {
+    this.dataUser = this.userData;
   }
 }
 </script>
@@ -53,7 +69,7 @@ export default {
       <div class="modal-content">
         <div class="modal-header">
           <h1 class="modal-title fs-5" id="staticBackdropLabel">Profile</h1>
-          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"
+          <button type="button" class="btn-close btn-close-profile" data-bs-dismiss="modal" aria-label="Close"
             @click="closeProfileModal()"></button>
         </div>
         <div class="modal-body">
@@ -65,18 +81,22 @@ export default {
             </div>
             <div class="mt-4">
               <input type="file" name="picture" class="d-none" @change="handleFile($event)">
-              <input type="text" name="email" placeholder="Email" v-model="userData.email" class="form-control" readonly
+              <input type="text" name="email" placeholder="Email" v-model="dataUser.email" class="form-control" readonly
                 disabled>
               <input type="date" name="dateofbirth" placeholder="Date Of Birth" class="form-control mt-3"
-                v-model="userData.dateOfBirth" required>
-              <select name="gender" class="form-control mt-3" v-model="userData.gender" required>
+                v-model="dataUser.dateOfBirth" required>
+              <select name="gender" class="form-control mt-3" v-model="dataUser.gender" required>
                 <option value="">Select Gender</option>
                 <option value="male">Male</option>
                 <option value="female">Female</option>
               </select>
             </div>
             <div class="d-flex justify-content-center">
-              <button type="submit" class="btn text-white text-primary-color mt-4">Save</button>
+              <button type="submit" class="btn text-white text-primary-color mt-4">
+                <LoadSpinner :class="{
+                  'd-none': !isLoad
+                }" /> {{ isLoad ? 'Loading' : 'Save' }}
+              </button>
             </div>
           </form>
         </div>

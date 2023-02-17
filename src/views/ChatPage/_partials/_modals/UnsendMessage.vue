@@ -1,24 +1,40 @@
+<script setup>
+import LoadSpinner from "../../../../components/LoadSpinner.vue";
+</script>
 <script>
 import { isEmpty } from "lodash";
+import { SendNotification } from "../../../../assets/js/helpers";
 import { firebaseUpdateSingleData } from "../../../../firebase";
 export default {
     props: {
         rightClickData: Object
     },
+    data() {
+        return {
+            isLoad: false,
+        }
+    },
     methods: {
         async confirmUnsendMessage() {
-            if (!isEmpty(this.rightClickData) && !isEmpty(this.rightClickData.data) && !isEmpty(this.rightClickData.data.data)) {
-                this.rightClickData.data.data[this.rightClickData.idx].is_unsend = true;
-                await firebaseUpdateSingleData('messages', this.rightClickData.data.id, this.rightClickData.data);
-                document.querySelector('.close-unsend').click();
+            this.isLoad = true;
+            try {
+                if (!isEmpty(this.rightClickData) && !isEmpty(this.rightClickData.data) && !isEmpty(this.rightClickData.data.message_details)) {
+                    let temp = this.rightClickData;
+                    temp.data.message_details[temp.idx].is_unsend = true;
+                    await firebaseUpdateSingleData('message_details', temp.data.message_details[temp.idx].id, temp.data.message_details[temp.idx]);
+                    document.querySelector('.close-unsend').click();
+                    SendNotification("Successfully Unsend Message", 200);
+                }
+            } catch (error) {
+                SendNotification(error.message, 500);
             }
+            this.isLoad = false;
         }
     }
 }
 </script>
 
 <template>
-    <!-- Modal -->
     <div class="modal fade" id="unsendMessageModal" data-bs-backdrop="static" data-bs-keyboard="false" tabindex="-1"
         aria-labelledby="staticBackdropLabel" aria-hidden="true">
         <div class="modal-dialog">
@@ -32,7 +48,11 @@ export default {
                     Confirm unsend this message ?
                     <div class="d-flex justify-content-center">
                         <button type="button" class="btn text-white text-primary-color mt-4"
-                            @click="confirmUnsendMessage()">Confirm</button>
+                            @click="confirmUnsendMessage()">
+                            <LoadSpinner :class="{
+                                'd-none': !isLoad
+                            }" /> {{ isLoad ? 'Loading' : 'Confirm' }}
+                        </button>
                     </div>
                 </div>
 

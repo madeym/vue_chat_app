@@ -17,7 +17,6 @@ initializeApp(firebaseConfig);
 const db = getFirestore();
 const auth = getAuth();
 let user_id = '';
-let userData = {};
 
 export const database = getFirestore();
 
@@ -45,16 +44,31 @@ export async function firebaseGetSingleData(colref, id, data, isSubscribe) {
     }
 }
 
-export async function firebaseGetDataByWhere(colref, keyword, data, isSubscribe) {
+export async function firebaseGetDataByWhere(colref, col, operator, keyword, data, isSubscribe) {
     if (isSubscribe) {
-
+        let q = (colref == 'messages') ? query(collection(db, colref), where(col, operator, keyword)) : query(collection(db, colref), where(col, operator, keyword), orderBy('created_at'));
+        try {
+            onSnapshot(q, (snapshot) => {
+                data.length = 0;
+                snapshot.docs.forEach((doc) => {
+                    data.push({ id: doc.id, ...doc.data() });
+                });
+            });
+        } catch (error) {
+            SendNotification(error.message, 500);
+        }
     } else {
         try {
-            let obj = await getDocs(query(collection(db, colref), where('email', '==', keyword)));
-            Object.assign(data, {});
-            Object.assign(data, { id: obj.docs[0].id, ...obj.docs[0].data() });
+            let obj = await getDocs(query(collection(db, colref), where(col, operator, keyword)));
+            let arr = [];
+            if (obj.docs.length > 0) {
+                obj.docs.forEach((doc) => {
+                    arr.push({ id: doc.id, ...doc.data() });
+                });
+                Object.assign(data, arr);
+            }
         } catch (error) {
-            console.log(error.message);
+            SendNotification(error.message, 500);
         }
     }
 }
