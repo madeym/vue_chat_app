@@ -1,18 +1,23 @@
 <script setup>
+import { SendNotification } from '../../../../assets/js/helpers';
 import LoadSpinner from '../../../../components/LoadSpinner.vue';
 </script>
 
 <script>
-import { firebaseGetDataByWhere, firebaseUpdateSingleData, firebaseCreateData } from '../../../../firebase';
+import { firebaseGetDataByWhere, firebaseCreateData } from '../../../../firebase';
+import { Timestamp } from "@firebase/firestore";
+import { isEmpty } from "lodash";
+
 export default {
     props: {
-        userData: Object
+        userData: Object,
+        chatData: Object
     },
     data() {
         return {
             searchResult: {},
             timeOut: '',
-            formSubmitted: false
+            isLoad: false
         }
     },
     methods: {
@@ -20,44 +25,39 @@ export default {
             if (this.timeOut) clearTimeout(this.timeOut);
             this.timeOut = setTimeout(async () => {
                 this.searchResult = {};
-                await firebaseGetDataByWhere('users', evt.target.value, this.searchResult, false);
+                await firebaseGetDataByWhere('users', 'email', '==', evt.target.value, this.searchResult, false);
             }, 1000);
         },
 
         async addContact(evt) {
             evt.preventDefault();
-            let defaultHTML = evt.target.innerHTML;
-            evt.target.disabled = true;
-            this.formSubmitted = true;
-            evt.target.innerHTML = 'Loading';
-
-            this.userData.contacts = (this.userData.contacts) ? this.userData.contacts : [];
-            this.searchResult.contacts = (this.searchResult.contacts) ? this.searchResult.contacts : [];
-
+            this.isLoad = true;
+            let flag = true;
             try {
-                let res = await firebaseCreateData('messages', {
-                    data: [],
-                    is_group: false,
+                this.chatData.forEach((list) => {
+                    if (!list.is_group) {
+                        list.users.forEach((user) => {
+                            if (user == this.searchResult[0].id) {
+                                flag = false;
+                            }
+                        });
+                    }
                 });
-                this.userData.contacts.push({
-                    user_id: this.searchResult.id,
-                    messages_id: res.id
-                });
-                this.searchResult.contacts.push({
-                    user_id: this.userData.id,
-                    messages_id: res.id
-                });
-                await firebaseUpdateSingleData('users', this.userData.id, this.userData);
-                await firebaseUpdateSingleData('users', this.searchResult.id, this.searchResult);
-                document.querySelector('.btn-close').click();
+                if (!flag) {
+                    SendNotification('User Already Added', 500);
+                } else {
+                    await firebaseCreateData('messages', {
+                        is_group: false,
+                        users: [this.userData.id, this.searchResult[0].id],
+                        created_at: Timestamp.now()
+                    });
+                    SendNotification('Successfully Added Contact', 200);
+                    document.querySelector('.btn-close').click();
+                }
             } catch (error) {
-                console.log(error.message);
+                SendNotification(error.message, 500);
             }
-
-            this.formSubmitted = false;
-            evt.target.innerHTML = defaultHTML;
-            evt.target.disabled = false;
-
+            this.isLoad = false;
         }
     },
 }
@@ -75,20 +75,20 @@ export default {
                 <div class="modal-body">
                     <form>
                         <div class="d-flex flex-column align-items-center">
-                            <img :src="searchResult.picture ? searchResult.picture : 'https://img.icons8.com/fluency/48/null/test-account.png'"
+                            <img :src="searchResult && searchResult[0] && searchResult[0].picture ? searchResult[0].picture : 'https://img.icons8.com/fluency/48/null/test-account.png'"
                                 class="circle cursor-pointer" width="100" height="100" />
-                            <h5 class="mt-3">{{ searchResult.displayName }}</h5>
+                            <h5 class="mt-3" v-if="searchResult && searchResult[0]">{{ searchResult[0].displayName }}</h5>
                         </div>
                         <div class="mt-4 d-flex justify-content-center">
                             <input type="text" placeholder="Search"
                                 class="shadow rounded-pill px-3 py-1 col-11 outline-0 border-0 left-search"
                                 name="searchContact" @keyup="searchContact($event)" required>
                         </div>
-                        <div class="d-flex justify-content-center">
-                            <button type="submit" class="btn text-white text-primary-color mt-4"
+                        <div v-if="!isEmpty(searchResult)" class="d-flex justify-content-center">
+                            <button type="submit" class="btn text-white text-primary-color mt-4" :disabled="isLoad"
                                 @click="addContact($event)">
-                                <LoadSpinner :class="{ 'd-none': !formSubmitted }" />
-                                <span>Add</span>
+                                <LoadSpinner :class="{ 'd-none': !isLoad }" />
+                                {{ isLoad ? 'Loading' : 'Add' }}
                             </button>
                         </div>
                     </form>

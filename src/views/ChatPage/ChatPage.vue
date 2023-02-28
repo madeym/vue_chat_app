@@ -4,7 +4,11 @@ import AddContact from './_partials/_modals/AddContact.vue';
 import Profile from './_partials/_modals/Profile.vue';
 import CreateGroup from './_partials/_modals/CreateGroup.vue';
 import UnsendMessage from './_partials/_modals/UnsendMessage.vue';
+import DeleteMessage from './_partials/_modals/DeleteMessage.vue';
 import CreatePoll from './_partials/_modals/CreatePoll.vue';
+import GroupInfo from './_partials/_modals/GroupInfo.vue';
+import GroupLeave from './_partials/_modals/GroupLeave.vue';
+import notificationSound from '../../assets/audio/notification.wav';
 </script>
 <script>
 import {
@@ -24,12 +28,20 @@ export default {
     return {
       userData: {},
       chatData: [],
+      chatDataDetail: [],
+      contactData: {},
+      rightClickData: {},
+      tempTypingData: {},
+      currectChatWindowID: -1,
+      totalChat: 0,
       isAlreadyRequestUserData: false,
       isFinishRequest: false,
-      currectChatWindowID: -1,
       showSideBar: true,
       showDarkWindow: false,
-      rightClickData: {},
+      showContactInfo: false,
+      typingUpdated: false,
+      searchChatKeyword: '',
+      timeoutTyping: '',
     };
   },
   methods: {
@@ -48,14 +60,29 @@ export default {
         }
       } else {
         this.showDarkWindow = false;
+        this.showContactInfo = false;
+        this.rightClickData = {};
+        setTimeout(() => {
+          this.contactData = {};
+        }, 600);
       }
     },
 
-    getChatListPicture(chat) {
-      let img = 'https://img.icons8.com/fluency/48/null/test-account.png';
-      if (!isEmpty(chat)) {
-        if (chat.is_group) {
+    checkSearchKeyword(chat, idx) {
+      if (!isEmpty(chat) && !isEmpty(chat.user_details) && !isEmpty(this.chatData[idx])) {
+        if (Array.isArray(chat.user_details)) {
+          return this.chatData[idx].group_data.name.includes(this.searchChatKeyword) ? false : true;
+        } else {
+          return chat.user_details.displayName.includes(this.searchChatKeyword) ? false : true;
+        }
+      }
+    },
 
+    getChatListPicture(chat, idx) {
+      let img = 'https://img.icons8.com/fluency/48/null/test-account.png';
+      if (!isEmpty(chat) && !isEmpty(this.chatData[idx])) {
+        if (this.chatData[idx].is_group) {
+          return (this.chatData[idx].group_data.picture) ? this.chatData[idx].group_data.picture : img;
         } else {
           if (!isEmpty(chat.user_details)) {
             return (chat.user_details.picture) ? chat.user_details.picture : img;
@@ -64,61 +91,86 @@ export default {
       }
     },
 
-    getChatListName(chat) {
-      if (!isEmpty(chat)) {
-        if (chat.is_group && !isEmpty(chat.group_data)) {
-          return chat.group_data.name;
-        } else if (!chat.is_group && !isEmpty(chat.user_details)) {
+    getChatListName(chat, idx) {
+      if (!isEmpty(chat) && !isEmpty(this.chatData[idx])) {
+        if (this.chatData[idx].is_group && !isEmpty(this.chatData[idx].group_data)) {
+          return this.chatData[idx].group_data.name;
+        } else if (!this.chatData[idx].is_group && !isEmpty(chat.user_details)) {
           return chat.user_details.displayName;
         }
       }
     },
 
-    getChatListLastMessage(chat) {
+    getChatListLastMessage(chat, idx, headerFlag = false) {
       let lastMsg = '';
-      if (!isEmpty(chat)) {
-        if (chat.message_details && chat.message_details.length != 0) {
-          if (chat.is_group) {
-            lastMsg = chat.message_details[chat.message_details.length - 1].user_name + ': ';
+      if (!isEmpty(chat) && !isEmpty(this.chatData[idx])) {
+        if (chat.typing_status.length != 0) {
+          chat.typing_status.forEach(list => {
+            if (list.user_id != this.userData.id) {
+              if (list.is_typing) {
+                lastMsg = 'typing..';
+              }
+            }
+          });
+        }
+
+        if (lastMsg != '') {
+          return lastMsg;
+        }
+        if (!headerFlag) {
+          if (chat.message_details && chat.message_details.length != 0) {
+            if (this.chatData[idx].is_group) {
+              lastMsg = chat.message_details[chat.message_details.length - 1].user_name + ': ';
+            }
+            if (chat.message_details[chat.message_details.length - 1].is_photo) {
+              lastMsg = lastMsg + 'image';
+            } else {
+              lastMsg = lastMsg + chat.message_details[chat.message_details.length - 1].message;
+            }
           }
-          if (chat.message_details[chat.message_details.length - 1].is_photo) {
-            lastMsg = lastMsg + 'image';
-          } else {
-            lastMsg = lastMsg + chat.message_details[chat.message_details.length - 1].message;
-          }
+          return lastMsg.substring(0, 20);
         }
       }
-      return lastMsg.substring(0, 40);
+    },
+
+    getChatNotification(chat, check = true) {
+      let unread = 0;
+      let flag = false;
+      if (chat.message_details.length > 0) {
+        chat.message_details.forEach((msg) => {
+          if (!this.checkMessage(msg.user_id) && !msg.is_read) {
+            unread++;
+            flag = true;
+          }
+        });
+      }
+      return check ? flag : unread;
     },
 
     selectWindowChat(window_id) {
       this.currectChatWindowID = window_id;
-      this.toggleSidebar();
+      // this.toggleSidebar();
       // this.scrollNewMessage();
     },
 
     getChatGroupMemberHeader(member) {
       let names = '';
-      try {
-        if (Array.isArray(member.userData)) {
-          member.userData.forEach((list, idx) => {
-            if (!(idx == member.length - 1)) {
-              names = names + list.displayName + ', ';
-            } else {
-              names = names + list.displayName;
-            }
-          });
-        }
-      } catch (error) {
-        SendNotification(error.message, 500);
+      if (Array.isArray(member)) {
+        member.forEach((list, idx) => {
+          if (!(idx == member.length - 1)) {
+            names = names + list.displayName + ', ';
+          } else {
+            names = names + list.displayName;
+          }
+        });
       }
       return names;
     },
 
     getChatGroupMemberPicture(chatData, chat) {
       let pic = 'https://img.icons8.com/fluency/48/null/test-account.png';
-      if (!isEmpty(chatData)) {
-        if (chatData.is_group) {
+      if (!isEmpty(chatData) && !isEmpty(this.chatData[this.currectChatWindowID])) {
+        if (this.chatData[this.currectChatWindowID].is_group) {
           chatData.user_details.forEach(list => {
             if (list.id == chat.user_id) {
               if (list.picture) {
@@ -139,38 +191,8 @@ export default {
       }
     },
 
-    selectAttach() {
-      document.querySelector('.add').fileAttach.click();
-    },
-
-    handleFile(evt, idx) {
-      try {
-        let file = evt.target.files[0];
-        if (file) {
-          let reader = new FileReader();
-          reader.readAsDataURL(file);
-          reader.onload = async () => {
-            if (this.fileAttach != "") {
-              await firebaseCreateData('message_details', {
-                user_id: this.userData.id,
-                user_name: this.userData.displayName,
-                is_deleted: false,
-                is_photo: true,
-                is_poll: false,
-                is_unsend: false,
-                messages_id: this.chatData[this.currectChatWindowID].id,
-                message: reader.result,
-                created_at: Timestamp.now(),
-                updated_at: Timestamp.now(),
-              });
-            } else {
-              return;
-            }
-          };
-        }
-      } catch (error) {
-        SendNotification(error.message, 500);
-      }
+    checkMessage(uidChat) {
+      return uidChat === this.userData.id ? true : false;
     },
 
     dateConvert(date) {
@@ -182,8 +204,101 @@ export default {
       }
     },
 
-    checkMessage(uidChat) {
-      return uidChat === this.userData.id ? true : false;
+    openContactInfo(chat) {
+      this.showContactInfo = !this.showContactInfo;
+      this.showDarkWindow = !this.showDarkWindow;
+      if (!isEmpty(chat)) {
+        if (this.chatData[this.currectChatWindowID].is_group) {
+          this.chatDataDetail[this.currectChatWindowID].user_details.forEach((list) => {
+            if (list.id == chat.user_id) {
+              this.contactData = list;
+              return;
+            }
+          });
+        } else {
+          this.contactData = this.chatDataDetail[this.currectChatWindowID].user_details;
+          return;
+        }
+      }
+    },
+
+    getMessage(chat) {
+      if (!isEmpty(chat)) {
+        if (chat.is_unsend && !chat.is_deleted) {
+          return 'this message was unsend';
+        } else if (chat.is_deleted) {
+          return 'this message was deleted';
+        } else {
+          return chat.message;
+        }
+      }
+    },
+
+    selectAttach() {
+      document.querySelector('.add').fileAttach.click();
+    },
+
+    handleFile(evt) {
+      try {
+        let file = evt.target.files[0];
+        let flag = true;
+        if (file) {
+          if (file.name.substring(file.name.lastIndexOf('.')) == '.jpg' || file.name.substring(file.name.lastIndexOf('.')) == '.png') {
+            let reader = new FileReader();
+            reader.readAsDataURL(file);
+            reader.onload = async () => {
+              if (this.fileAttach != "") {
+                await firebaseCreateData('message_details', {
+                  user_id: this.userData.id,
+                  user_name: this.userData.displayName,
+                  is_deleted: false,
+                  is_photo: true,
+                  is_poll: false,
+                  is_unsend: false,
+                  messages_id: this.chatData[this.currectChatWindowID].id,
+                  message: reader.result,
+                  created_at: Timestamp.now(),
+                  updated_at: Timestamp.now(),
+                });
+              } else {
+                return;
+              }
+            };
+          } else {
+            SendNotification('Wrong File Format', 500);
+          }
+        }
+      } catch (error) {
+        SendNotification(error.message, 500);
+      }
+    },
+
+    async updateIsTyping(evt) {
+      if (evt.keyCode != 8 && evt.keyCode != 17) {
+        if (this.timeoutTyping != '') {
+          clearTimeout(this.timeoutTyping);
+          if (!this.typingUpdated) {
+            if (this.chatDataDetail[this.currectChatWindowID].typing_status.length != 0) {
+              this.chatDataDetail[this.currectChatWindowID].typing_status.forEach(async (list) => {
+                if (list.user_id == this.userData.id) {
+                  this.tempTypingData = list;
+                  this.tempTypingData.is_typing = true;
+                  await firebaseUpdateSingleData('message_typing_status', this.tempTypingData.id, this.tempTypingData);
+                  this.typingUpdated = true;
+                }
+              });
+            }
+          }
+        }
+        this.timeoutTyping = setTimeout(async () => {
+          if (!isEmpty(this.tempTypingData)) {
+            this.tempTypingData.is_typing = false;
+            await firebaseUpdateSingleData('message_typing_status', this.tempTypingData.id, this.tempTypingData);
+            this.tempTypingData = {};
+            this.typingUpdated = false;
+          }
+        }, 500);
+      }
     },
 
     async sendMessage(e) {
@@ -197,6 +312,7 @@ export default {
             is_photo: false,
             is_poll: false,
             is_unsend: false,
+            is_read: false,
             messages_id: this.chatData[this.currectChatWindowID].id,
             message: document.querySelector(".add").message.value,
             created_at: Timestamp.now(),
@@ -239,17 +355,26 @@ export default {
       );
     },
 
-    rightClickMessage(evt, chatData, idx) {
-      if (this.checkMessage(chatData.message_details[idx].user_id)) {
+    rightClickMessage(evt, chat, idx) {
+      if (this.checkMessage(chat.user_id)) {
         if (evt.which == 3 && !this.showDarkWindow) {
           evt.preventDefault();
-          this.rightClickData.data = chatData;
+          this.rightClickData.data = chat;
           this.rightClickData.idx = idx;
           this.showDarkWindow = true;
-          document.querySelector('.right-click-message').style.top = evt.screenY + 'px';
-          document.querySelector('.right-click-message').style.left = evt.screenX + 'px';
+          document.querySelector('.right-click-message').style.top = (evt.clientY + 10) + 'px';
+          document.querySelector('.right-click-message').style.left = evt.clientX + 'px';
         }
       } else return;
+    },
+
+    startAudioNotification() {
+      const audio = new Audio(notificationSound);
+      audio.play();
+    },
+
+    resetChatWindow() {
+      this.currectChatWindowID = -1;
     },
 
     async logout() {
@@ -270,49 +395,101 @@ export default {
 
     watch(this.userData, async () => {
       if (!this.isAlreadyRequestUserData) {
-        this.isAlreadyRequestUserData = true;
         await firebaseGetDataByWhere('messages', 'users', 'array-contains', this.userData.id, this.chatData, true);
+        this.isAlreadyRequestUserData = true;
       } else return;
     });
 
     watch(this.chatData, async () => {
       try {
+        if (this.chatData.length == 1 && isEmpty(this.chatData[0]) && !this.isFinishRequest) {
+          this.chatData.length = 0;
+          this.totalChat = 0;
+          document.getElementById('loadingbtn').click();
+          this.isFinishRequest = true;
+          return;
+        }
+
         if (!isEmpty(this.chatData) && !this.isFinishRequest) {
           let flag = true;
-          this.chatData.forEach(async (list) => {
+          this.chatData.forEach(async (list, idx) => {
             if (!list.isAlreadyRequest) {
-              list.user_details = (list.is_group) ? [] : {};
-              list.users.forEach(async (user, idx) => {
-                if (list.is_group) {
-                  list.user_details[idx] = {};
-                  await firebaseGetSingleData('users', user, list.user_details[idx], true);
-                } else {
-                  await firebaseGetSingleData('users', user, list.user_details, true);
+              this.chatDataDetail[idx] = {};
+              this.chatDataDetail[idx].id = list.id;
+              this.chatDataDetail[idx].user_details = (list.is_group) ? [] : {};
+              this.chatDataDetail[idx].typing_status = [];
+              list.users.forEach(async (user, idx2) => {
+                if (user != this.userData.id) {
+                  if (list.is_group) {
+                    this.chatDataDetail[idx].user_details[idx2] = {};
+                    await firebaseGetSingleData('users', user, this.chatDataDetail[idx].user_details[idx2], true);
+                  } else {
+                    await firebaseGetSingleData('users', user, this.chatDataDetail[idx].user_details, true);
+                  }
                 }
               });
-
-              list.message_details = [];
-              await firebaseGetDataByWhere('message_details', 'messages_id', '==', list.id, list.message_details, true);
+              this.chatDataDetail[idx].message_details = [];
+              await firebaseGetDataByWhere('message_details', 'messages_id', '==', list.id, this.chatDataDetail[idx].message_details, true);
+              await firebaseGetDataByWhere('message_typing_status', 'messages_id', '==', list.id, this.chatDataDetail[idx].typing_status, true);
               list.isAlreadyRequest = true;
             } else {
-              if (isEmpty(list.message_details)) {
+              if (this.chatDataDetail[idx].message_details.length == 0) {
                 flag = false;
               }
               if (list.is_group) {
-                list.user_details.forEach((data) => {
+                this.chatDataDetail[idx].user_details.forEach((data) => {
                   if (isEmpty(data)) flag = false;
                 });
               } else {
-                if (isEmpty(list.user_details)) flag = false;
+                if (this.chatDataDetail[idx].user_details.length == 0) flag = false;
               }
             }
           });
-
           if (flag) {
-            this.isFinishRequest = true;
+            this.totalChat = this.chatData.length;
             document.getElementById('loadingbtn').click();
+            this.isFinishRequest = true;
           }
-        } else return;
+        }
+
+        if (this.isFinishRequest) {
+          if (this.totalChat < this.chatData.length) {
+            this.chatDataDetail[this.chatData.length - 1] = {};
+            this.chatDataDetail[this.chatData.length - 1].id = this.chatData[this.chatData.length - 1].id;
+            this.chatDataDetail[this.chatData.length - 1].user_details = (this.chatData[this.chatData.length - 1].is_group) ? [] : {};
+            this.chatDataDetail[this.chatData.length - 1].typing_status = [];
+            this.chatData[this.chatData.length - 1].users.forEach(async (user, idx2) => {
+              if (this.chatData[this.chatData.length - 1].is_group) {
+                this.chatDataDetail[this.chatData.length - 1].user_details[idx2] = {};
+                await firebaseGetSingleData('users', user, this.chatDataDetail[this.chatData.length - 1].user_details[idx2], true);
+              } else {
+                await firebaseGetSingleData('users', user, this.chatDataDetail[this.chatData.length - 1].user_details, true);
+              }
+            });
+            this.chatDataDetail[this.chatData.length - 1].message_details = [];
+            await firebaseGetDataByWhere('message_details', 'messages_id', '==', this.chatData[this.chatData.length - 1].id, this.chatDataDetail[this.chatData.length - 1].message_details, true);
+            await firebaseGetDataByWhere('message_typing_status', 'messages_id', '==', this.chatData[this.chatData.length - 1].id, this.chatDataDetail[this.chatData.length - 1].typing_status, true);
+            this.totalChat = this.chatData.length;
+          } else if (this.totalChat > this.chatData.length) {
+            let flag = false;
+            this.chatDataDetail.forEach((list_details, idx) => {
+              if (!isEmpty(this.chatData[idx])) {
+                if (list_details.id != this.chatData[idx].id) {
+                  this.chatDataDetail.splice(idx, 1);
+                  flag = true;
+                  this.totalChat = this.chatData.length;
+                  return;
+                }
+              }
+            });
+            if (!flag) {
+              this.chatDataDetail.splice(this.chatDataDetail.length - 1, 1);
+              this.totalChat = this.chatData.length;
+            }
+          } else {
+            return;
+          }
+        }
       } catch (error) {
         SendNotification(error.message, 500);
       }
@@ -324,29 +501,37 @@ export default {
 <template>
   <Loading v-if="!isFinishRequest" />
   <div v-if="isFinishRequest" class="d-flex h-100 position-relative">
-    <AddContact :userData="userData" />
+    <!-- Left Menu -->
     <Profile :userData="userData" />
-    <CreateGroup :userData="userData" />
+    <AddContact :userData="userData" :chatData="chatData" />
+    <CreateGroup v-if="isFinishRequest" :userData="userData" :chatDataDetail="chatDataDetail" />
+    <!-- Right Click Menu -->
     <UnsendMessage :rightClickData="rightClickData" />
+    <DeleteMessage :rightClickData="rightClickData" />
     <CreatePoll :chatData="currectChatWindowID != -1 ? chatData[currectChatWindowID] : {}" :userData="userData" />
+    <GroupInfo :chatData="chatData[currectChatWindowID] ? chatData[currectChatWindowID] : {}"
+      :chatDataDetail="chatDataDetail[currectChatWindowID] ? chatDataDetail[currectChatWindowID] : {}"
+      :userData="userData" />
+    <GroupLeave @resetChatWindow="resetChatWindow()"
+      :chatData="chatData[currectChatWindowID] ? chatData[currectChatWindowID] : {}" :userData="userData" />
     <div class="dropdown right-click-message" style="width: fit-content;">
       <span data-bs-toggle="dropdown" aria-expanded="false"></span>
-      <ul class="dropdown-menu right-click-message-dropdown" :class="{ 'show': showDarkWindow }">
+      <ul class="dropdown-menu right-click-message-dropdown" :class="{ 'show': !isEmpty(rightClickData) }">
         <li><a class="dropdown-item edit-msg" href="#">Edit Message</a>
         </li>
-        <li v-if="!isEmpty(rightClickData) && !rightClickData.data.message_details[rightClickData.idx].is_unsend"><a
-            class="dropdown-item unsend-msg" href="#" data-bs-toggle="modal" data-bs-target="#unsendMessageModal">Unsend
+        <li v-if="!isEmpty(rightClickData) && !rightClickData.data.is_unsend"><a class="dropdown-item unsend-msg" href="#"
+            data-bs-toggle="modal" data-bs-target="#unsendMessageModal">Unsend
             Message</a>
         </li>
-        <li><a class="dropdown-item delete-msg" href="#">Delete Message</a>
+        <li v-if="!isEmpty(rightClickData) && !rightClickData.data.is_deleted"><a class="dropdown-item delete-msg"
+            href="#" data-bs-toggle="modal" data-bs-target="#deleteMessageModal">Delete Message</a>
         </li>
       </ul>
     </div>
-    <div class="left-content col-lg-3 col-5 bg-secondary-color">
+    <div class="left-content col-lg-3 col-5 bg-secondary-color shadow">
       <div class="d-flex flex-column align-items-center mt-4 position-relative">
         <div class="dropdown position-absolute" style="top: 5px; left: 20px;" :class="{ 'opacity-0': !showSideBar }">
-          <img src="https://img.icons8.com/ios-filled/50/null/menu-2.png" width="20" class="cursor-pointer"
-            data-bs-toggle="dropdown" aria-expanded="false" />
+          <i class="bi bi-three-dots-vertical cursor-pointer fs-5" data-bs-toggle="dropdown" aria-expanded="false"></i>
           <ul class="dropdown-menu">
             <li><a class="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#profileModal">Profile</a>
             </li>
@@ -360,30 +545,36 @@ export default {
           </ul>
         </div>
         <h3 class="text-left mb-3 text-white fw-bold left-title" :class="{ 'opacity-0': !showSideBar }">Chats</h3>
-        <img src="https://img.icons8.com/sf-black/64/000000/long-arrow-right.png" width="30"
-          class="position-absolute btn-sidebar cursor-pointer" style="right: 20px; top: 5px;" @click="toggleSidebar()" />
+        <i class="bi bi-arrow-right-short cursor-pointer fs-3 position-absolute btn-sidebar"
+          style="right: 20px; top: -1px;" @click="toggleSidebar()"></i>
         <form class="col-12 d-flex justify-content-center searchMsg">
           <input type="text" placeholder="Search"
             class="shadow rounded-pill px-3 py-1 col-11 outline-0 border-0 left-search" name="searchMsg"
-            :class="{ 'opacity-0': !showSideBar }">
+            :class="{ 'opacity-0': !showSideBar }" v-model="searchChatKeyword">
         </form>
       </div>
       <div class="d-flex flex-column mt-4">
-        <div v-for="(chat, index) in chatData" class="d-flex align-items-center chat-list cursor-pointer"
-          :class="{ 'chat-list-hide': !showSideBar, 'active-window bg-primary-color': currectChatWindowID == index }"
+        <div v-for="(chat, index) in chatDataDetail" class="d-flex align-items-center chat-list cursor-pointer"
+          :class="{ 'chat-list-hide': !showSideBar, 'bg-primary-color shadow': currectChatWindowID == index, 'd-none': checkSearchKeyword(chat, index) }"
           @click="selectWindowChat(index)">
-          <div class="d-flex align-items-center gap-2 chat-wrapper px-2 ms-1 py-2"
+          <div class="d-flex align-items-center gap-2 chat-wrapper px-2 mx-1 py-2"
             :class="{ 'chat-wrapper-hide': !showSideBar }">
-            <img :src="getChatListPicture(chat)" class="circle mt-1 w-50px h-50px img" />
-            <div class="d-grid justify-content-center chat-name-msg" :class="{ 'opacity-0': !showSideBar }">
-              <span class="fw-bold text-white" style="font-size: 18px;">{{ getChatListName(chat) }}</span>
-              <span style="font-size: 14px;" class="d-flex align-items-center text-white"><img
-                  src="https://img.icons8.com/fluency/48/null/image.png"
-                  v-if="chat.message_details && chat.message_details[chat.message_details.length - 1] && chat.message_details[chat.message_details.length - 1].is_photo"
+            <img :src="getChatListPicture(chat, index)" class="circle mt-1 h-50px w-50px" />
+            <div class="d-grid chat-name-msg" :class="{ 'opacity-0': !showSideBar }">
+              <span class="fw-bold text-white" :class="{ 'color-grey': currectChatWindowID == index }"
+                style="font-size: 18px;">{{ getChatListName(chat, index) }}</span>
+              <span style="font-size: 14px;" class="d-flex align-items-center text-white"
+                :class="{ 'color-grey': currectChatWindowID == index }">
+                <img src="https://img.icons8.com/fluency/48/null/image.png"
+                  v-if="!isEmpty(chat) && chat.message_details && chat.message_details[chat.message_details.length - 1] && chat.message_details[chat.message_details.length - 1].is_photo"
                   width="20" class="me-2" />{{
-                    getChatListLastMessage(chat)
-                  }}</span>
+                    getChatListLastMessage(chat, index)
+                  }}
+              </span>
             </div>
+            <span v-if="!isEmpty(chat) && !isEmpty(chat.message_details) && getChatNotification(chat)"
+              class="rounded-circle p-2 bg-warning text-white d-flex align-items-center justify-content-center mt-1 shadow"
+              style="height: 25px; width: 25px;">{{ getChatNotification(chat, false) }}</span>
           </div>
         </div>
       </div>
@@ -392,53 +583,85 @@ export default {
       <div class="dark-chat-window cursor-pointer" :class="{ 'dark-chat-window-active': showSideBar || showDarkWindow }"
         @click="toggleSidebar()">
       </div>
+      <div class="bg-primary-color shadow contact-info-sidebar d-flex flex-column"
+        :class="{ 'contact-info-sidebar-show': showContactInfo }">
+        <div class="info-header d-grid justify-content-center" style="margin-top: 70px;">
+          <img
+            :src="!isEmpty(contactData) && contactData.picture ? contactData.picture : 'https://img.icons8.com/fluency/48/null/test-account.png'"
+            class="circle cursor-pointer" width="100" height="100" />
+          <h5 class="mt-3 text-center">{{ !isEmpty(contactData) ? contactData.displayName : '-' }}</h5>
+        </div>
+
+        <div class="info-body mt-2 d-grid gap-2 py-3 px-4">
+          <span><i class="me-2 bi bi-envelope-at-fill"></i> {{ !isEmpty(contactData) ? contactData.email : '-' }}</span>
+          <span><i class="me-2 bi bi-telephone-fill"></i> {{ !isEmpty(contactData) && contactData.phone ?
+            contactData.phone : '-' }}</span>
+          <span><i class="me-2 bi bi-calendar-fill"></i> {{ !isEmpty(contactData) && contactData.dateOfBirth ?
+            contactData.dateOfBirth : '-' }}</span>
+          <span><i class="me-2 bi bi-gender-ambiguous"></i> {{ !isEmpty(contactData) && contactData.gender ?
+            contactData.gender : "-" }}</span>
+        </div>
+      </div>
       <div v-if="currectChatWindowID == -1" style="height: 100vh;"
         class="d-flex justify-content-center align-items-center">
         <div class="d-flex flex-column justify-content-center">
           <h6 class="color-grey">Select message to start chatting.</h6>
         </div>
       </div>
-      <div
-        v-if="chatData && chatData[currectChatWindowID] && !isEmpty(chatData[currectChatWindowID]) && !isEmpty(chatData[currectChatWindowID].userData) && chatData[currectChatWindowID].is_group"
-        class="px-2 py-3 shadow group-window-header">
+      <div class="px-2 shadow group-window-header d-flex align-items-center position-relative">
         <div class="d-flex gap-3">
-          <img :src="chatData[currectChatWindowID].group_data.picture" class="w-50px h-50px img circle" alt="">
+          <img :src="getChatListPicture(chatDataDetail[currectChatWindowID], currectChatWindowID)"
+            class="w-50px h-50px circle" alt="">
           <div class="d-grid">
-            <span class="">{{ chatData[currectChatWindowID].group_data.name }}</span>
-            <span class="color-grey">{{
-              getChatGroupMemberHeader(chatData[currectChatWindowID])
-            }}</span>
+            <span class="">{{ getChatListName(chatDataDetail[currectChatWindowID], currectChatWindowID) }}</span>
+            <span
+              v-if="!isEmpty(chatData[currectChatWindowID]) && !isEmpty(chatDataDetail[currectChatWindowID]) && chatData[currectChatWindowID].is_group"
+              class="color-grey">{{
+                getChatGroupMemberHeader(chatDataDetail[currectChatWindowID].user_details)
+              }}</span>
+            <span v-else class="color-grey">{{ getChatListLastMessage(chatDataDetail[currectChatWindowID],
+              currectChatWindowID, true) }}</span>
+          </div>
+          <div class="dropdown position-absolute translate-middle top-50 end-0 z-index-1">
+            <i class="bi bi-three-dots-vertical cursor-pointer fs-5" data-bs-toggle="dropdown" aria-expanded="false"></i>
+            <ul class="dropdown-menu">
+              <li><a class="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#groupInfoModal">Info</a>
+              </li>
+              <li><a class="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#addContactModal">Invite</a>
+              </li>
+              <li><a class="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#groupLeaveModal">Leave</a>
+              </li>
+            </ul>
           </div>
         </div>
       </div>
-      <div v-if="currectChatWindowID != -1" class="d-flex flex-column position-relative py-3 overflow-y-auto"
-        :class="{ 'h-85': chatData[currectChatWindowID].is_group, 'h-95': !chatData[currectChatWindowID].is_group }">
-        <div v-for="(chat, idxChat) in chatData[currectChatWindowID].message_details" v-bind:key="chat.id"
+      <div v-if="currectChatWindowID != -1 && !isEmpty(chatDataDetail[currectChatWindowID])"
+        class="d-flex flex-column position-relative py-3 overflow-y-auto h-85">
+        <div v-for="(chat, idxChat) in chatDataDetail[currectChatWindowID].message_details" v-bind:key="chat.id"
           class="mt-2 d-grid col-12 chat-content py-1 px-2" :class="{
             'justify-content-end': checkMessage(chat.user_id),
           }">
           <div class="d-flex align-items-end">
             <div v-if="!checkMessage(chat.user_id)" class="d-flex align-items-start h-100">
-              <img :src="getChatGroupMemberPicture(chatData[currectChatWindowID], chat)" width="50"
-                class="circle mt-1 me-2" />
+              <img :src="getChatGroupMemberPicture(chatDataDetail[currectChatWindowID], chat)" width="50"
+                class="circle mt-1 me-2 cursor-pointer" @click="openContactInfo(chat, idxChat)" />
             </div>
             <span v-if="checkMessage(chat.user_id)" style="font-size: 12px" class="me-2">{{
               dateConvert(chat.created_at)
             }}</span>
             <div class="d-flex flex-column"
               :class="{ 'z-index-3': (!isEmpty(rightClickData) && idxChat == rightClickData.idx) }"
-              @mousedown="rightClickMessage($event, chatData[currectChatWindowID], idxChat)"
-              oncontextmenu="return false;">
+              @mousedown="rightClickMessage($event, chat, idxChat)" oncontextmenu="return false;">
               <span class="p-1" v-if="!checkMessage(chat.user_id)">{{ chat.user_name }}</span>
               <img v-if="!chat.is_unsend && chat.is_photo && !chat.is_poll" :src="chat.message" alt="" width="120"
-                class="shadow cursor-pointer">
+                class="shadow cursor-pointer rounded">
               <span v-else-if="(chat.is_unsend || !chat.is_photo) && !chat.is_poll" class="py-2 rounded px-3 shadow"
                 :class="{
-                  'text-primary-color text-white': checkMessage(chat.user_id),
+                  'text-primary-color text-white cursor-pointer': checkMessage(chat.user_id),
                   'bg-light': !checkMessage(chat.user_id),
-                  'fst-italic': chat.is_unsend
+                  'fst-italic': (chat.is_unsend || chat.is_deleted)
                 }" style="width: fit-content; margin: 0 !important">
-                {{ chat.is_unsend ? 'this message was unsend' : chat.message }}
+                {{ getMessage(chat) }}
               </span>
               <span v-if="chat.is_poll" class="py-2 rounded px-3 shadow" :class="{
                 'text-primary-color text-white': checkMessage(chat.user_id),
@@ -447,7 +670,7 @@ export default {
                 <div class="d-grid">
                   <h5 class="fw-bold">Poll :</h5>
                   <h6>{{ chat.poll_title }}</h6>
-                  <div v-for="(option, idx) in chat.optionData" class="d-grid mb-2">
+                  <div v-for="(option, idx) in chat.option_data" class="d-grid mb-2">
                     <div class="d-flex align-items-center gap-2 mb-1">
                       <input type="radio" name="vote" class="form-check-input">
                       <span>{{ idx + 1 }}. {{ option.name }}</span>
@@ -468,7 +691,8 @@ export default {
           </div>
         </div>
       </div>
-      <form v-if="currectChatWindowID != -1" class="add" @submit.prevent="sendMessage($event)" style="height: 5vh;">
+      <form v-if="currectChatWindowID != -1 && !isEmpty(chatData[currectChatWindowID])" class="add"
+        @submit.prevent="sendMessage($event)" style="height: 5vh;">
         <div class="d-flex">
           <div class="dropdown bg-light d-flex justify-content-center align-items-center px-3 cursor-pointer"
             data-bs-toggle="dropdown">
@@ -476,7 +700,7 @@ export default {
             <ul class="dropdown-menu right-click-message-dropdown">
               <li><a href="#" class="dropdown-item d-flex align-items-center gap-2" @click="selectAttach()">
                   <font-awesome-icon icon="fa-solid fa-paperclip" />
-                  Attach File
+                  Attach Image
                 </a></li>
               <li v-if="chatData[currectChatWindowID].is_group"><a href="#"
                   class="dropdown-item d-flex align-items-center gap-2" data-bs-toggle="modal"
@@ -487,7 +711,8 @@ export default {
             </ul>
           </div>
           <input type="file" class="d-none" name="fileAttach" @change="handleFile($event, idx)">
-          <input type="text" name="message" class="px-2 input-msg border-0" placeholder="Message" />
+          <input type="text" name="message" class="px-2 input-msg border-0" placeholder="Message"
+            @keyup="updateIsTyping($event)" />
           <button type="submit" class="btn text-primary-color rounded-0" style="width: 50px;">
             <img
               src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABgAAAAYCAYAAADgdz34AAAACXBIWXMAAAsTAAALEwEAmpwYAAABLUlEQVR4nO3UQSsEUQDA8ZH24KCUcrA+gHKRL7GOLs7cuDktSYm7/RTrC0hOm5OLiwuOFIWbKESxfpo8NdbM7Kzdi/K/zevN/9+89+ZF0T8BTKKGC+xFvQBlVHHsO5fdSAcwi128SmerU2k/KqjjMUX4jpfE82RR8QQ2wrpm8YydEIk5bScdxRKOcqRfXGMBT4mxapZ4Gg00FeMQU7hKjMXvlrMCd4pTx1CIJGnkLc16AXETK+gLkVbm2q3/Zo78ATNhXhxpJd6HwdxATuQ8PlGJvXpLmbPdVp4ROcBIGB/HfcYXVgoHgmweqyiF52GcZchv4p+xo0BLrIT9nP2p/VoegzX5FLsassBijvykK3mBI7wc9Qo/I/GPN9azQEok+2roBp/Xym3HZ/9P8gH1+UY/SOoF3AAAAABJRU5ErkJggg=="

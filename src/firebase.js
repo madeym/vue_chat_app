@@ -46,13 +46,18 @@ export async function firebaseGetSingleData(colref, id, data, isSubscribe) {
 
 export async function firebaseGetDataByWhere(colref, col, operator, keyword, data, isSubscribe) {
     if (isSubscribe) {
-        let q = (colref == 'messages') ? query(collection(db, colref), where(col, operator, keyword)) : query(collection(db, colref), where(col, operator, keyword), orderBy('created_at'));
         try {
-            onSnapshot(q, (snapshot) => {
+            onSnapshot(query(collection(db, colref), where(col, operator, keyword), orderBy('created_at')), (snapshot) => {
                 data.length = 0;
-                snapshot.docs.forEach((doc) => {
-                    data.push({ id: doc.id, ...doc.data() });
-                });
+                if (snapshot.docs.length > 0) {
+                    snapshot.docs.forEach((doc) => {
+                        data.push({ id: doc.id, ...doc.data() });
+                    });
+                } else {
+                    if (colref == 'messages') {
+                        data.push({});
+                    }
+                }
             });
         } catch (error) {
             SendNotification(error.message, 500);
@@ -61,11 +66,16 @@ export async function firebaseGetDataByWhere(colref, col, operator, keyword, dat
         try {
             let obj = await getDocs(query(collection(db, colref), where(col, operator, keyword)));
             let arr = [];
+            data.length = 0;
             if (obj.docs.length > 0) {
                 obj.docs.forEach((doc) => {
                     arr.push({ id: doc.id, ...doc.data() });
                 });
                 Object.assign(data, arr);
+            } else {
+                if (colref == 'messages') {
+                    data.push({});
+                }
             }
         } catch (error) {
             SendNotification(error.message, 500);

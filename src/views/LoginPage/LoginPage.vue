@@ -36,10 +36,12 @@ export default {
   <div class="login-form position-absolute top-50 start-50 translate-middle" style="width: 300px">
     <form class="signin" @submit.prevent="SignIn">
       <h2 class="text-center mb-4">Sign In</h2>
-      <div class="form-group mb-3">
+      <div class="input-group mb-3">
+        <span class="input-group-text"><i class="bi bi-envelope-at-fill"></i></span>
         <input type="text" name="email" class="form-control" placeholder="Email" required />
       </div>
-      <div class="form-group mb-2">
+      <div class="input-group mb-2">
+        <span class="input-group-text"><i class="bi bi-lock-fill"></i></span>
         <input type="password" name="password" class="form-control" placeholder="Password" required />
       </div>
       <div class="form-group mb-4">
@@ -47,10 +49,10 @@ export default {
           <input type="checkbox" /> Remember me</label>
       </div>
       <div class="form-group mb-4 d-flex justify-content-center">
-        <button type="submit" class="btn btn-primary btn-block" id="signInBtn" :disabled="isLoad">
+        <button type="submit" class="btn btn-primary" id="signInBtn" :disabled="isLoad">
           <LoadSpinner :class="{
             'd-none': !isLoad
-          }" /> {{ isLoad? 'Loading': 'Sign In' }}
+          }" /> {{ isLoad ? 'Loading' : 'Sign In' }}
         </button>
       </div>
     </form>

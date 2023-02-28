@@ -25,27 +25,36 @@ export default {
     },
 
     handleFile(evt) {
-      let file = evt.target.files[0];
-      if (file) {
-        let reader = new FileReader();
-        reader.readAsDataURL(file);
-        reader.onload = async () => {
-          this.profilePicture = reader.result;
-        };
+      try {
+        let file = evt.target.files[0];
+        if (file) {
+          if (file.name.substring(file.name.lastIndexOf('.')) == '.jpg' || file.name.substring(file.name.lastIndexOf('.')) == '.png') {
+            let reader = new FileReader();
+            reader.readAsDataURL(file);
+            reader.onload = async () => {
+              this.profilePicture = reader.result;
+            };
+          } else {
+            SendNotification('Wrong File Format', 500);
+          }
+        }
+      } catch (error) {
+        SendNotification(error.message, 500);
       }
     },
 
     async updateProfile(evt) {
-      this.isLoad = true;
       evt.preventDefault();
+      this.isLoad = true;
       try {
         let temp = {
           id: this.userData.id,
-          dateOfBirth: this.userData.dateOfBirth,
+          dateOfBirth: this.dataUser.dateOfBirth,
           displayName: this.userData.displayName,
           email: this.userData.email,
           gender: this.dataUser.gender,
-          picture: (this.profilePicture != '') ? this.profilePicture : this.userData.picture
+          picture: (this.profilePicture != '') ? this.profilePicture : this.userData.picture,
+          phone: this.dataUser.phone
         }
         await firebaseUpdateSingleData('users', temp.id, temp);
         document.querySelector('.btn-close-profile').click();
@@ -81,18 +90,32 @@ export default {
             </div>
             <div class="mt-4">
               <input type="file" name="picture" class="d-none" @change="handleFile($event)">
-              <input type="text" name="email" placeholder="Email" v-model="dataUser.email" class="form-control" readonly
-                disabled>
-              <input type="date" name="dateofbirth" placeholder="Date Of Birth" class="form-control mt-3"
-                v-model="dataUser.dateOfBirth" required>
-              <select name="gender" class="form-control mt-3" v-model="dataUser.gender" required>
-                <option value="">Select Gender</option>
-                <option value="male">Male</option>
-                <option value="female">Female</option>
-              </select>
+              <div class="input-group">
+                <span class="input-group-text"><i class="bi bi-envelope-at-fill"></i></span>
+                <input type="text" name="email" placeholder="Email" v-model="dataUser.email" class="form-control" readonly
+                  disabled>
+              </div>
+              <div class="input-group mt-3">
+                <span class="input-group-text"><i class="bi bi-telephone-fill"></i></span>
+                <input type="text" name="phone" placeholder="Phone" v-model="dataUser.phone" class="form-control"
+                  required>
+              </div>
+              <div class="input-group mt-3">
+                <span class="input-group-text"><i class="bi bi-calendar-fill"></i></span>
+                <input type="date" name="dateofbirth" placeholder="Date Of Birth" class="form-control"
+                  v-model="dataUser.dateOfBirth" required>
+              </div>
+              <div class="input-group mt-3">
+                <span class="input-group-text"><i class="bi bi-gender-ambiguous"></i></span>
+                <select name="gender" class="form-control" v-model="dataUser.gender" required>
+                  <option value="">Select Gender</option>
+                  <option value="male">Male</option>
+                  <option value="female">Female</option>
+                </select>
+              </div>
             </div>
             <div class="d-flex justify-content-center">
-              <button type="submit" class="btn text-white text-primary-color mt-4">
+              <button type="submit" class="btn text-white text-primary-color mt-4" :disabled="isLoad">
                 <LoadSpinner :class="{
                   'd-none': !isLoad
                 }" /> {{ isLoad ? 'Loading' : 'Save' }}
